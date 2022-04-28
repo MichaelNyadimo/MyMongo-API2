@@ -88,3 +88,48 @@ exports.deleteItem = function(req, res){
         res.json({message: 'Deleted successfully'});
     });
 };
+
+const _buildValueString = (req) => {
+    const body = req.body;
+    const values = Object.keys(body).map(
+        (key) => '${key} = ${escape(body[key]))' 
+    )
+    values.push('created_data = NOW()');
+    values.join(',');
+    return values;
+};
+
+exports.updateTask = async (req, res) => {
+    const con = await connection().catch((err) => {
+        throw err;
+    })};
+    
+    const values = _buildValueString(res);
+
+    const result = await query(
+        con,
+        UPDATE_TASK(req.user.id, req.params.taskId, values)
+    ).catch(serverError(res));
+
+    if(result.affectedRows == 1){
+        res
+        .status(500)
+        .json({ msg: 'Update to task:'});
+    }
+    res.json(result);
+
+    exports.deleteTask = async (req, res) => {
+        const con = await connection().catch((err) =>{
+            throw err;
+        }
+    )}
+
+    const result1 = await query(
+        con,
+        DELETE_TASK(req.user.id, req.params.taskId)
+    ).catch(serverError(err));
+    if(result.affectedRows == 1){
+        res
+        .status(500)
+        .json({ msg:'Unable to delete task'})
+    }

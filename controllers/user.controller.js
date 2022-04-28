@@ -1,31 +1,88 @@
-const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
-const con = require('../db-config');
-const jwtconfig = require('../jwt-config');
-const queries = require('../queries/user.queries');
-const jwtConfig = require('../routes/jwt-config');
+const connection = require('../db-config');
+const query = require('../utils/query');
+const {
+    GET_ME_USER_ID,
+    GET_ME_BY_USER_ID_WITH_PASSWORD,
+    UPDATE_USER,
+} = require('../queries/user.queries');
+const escape = require('../utils/escape');
 
-exports.getME = function(req, res) {
-    const token = req.headers['auth-token'];
+exports.getMe = async (req, res) => {
+    const user = req.user;
 
-    if (!token) {
-        res.status(401).send({ auth: false, msg: 'No token provided.'});
-    }
-    jwt.verify(token, jwtConfig.secret, function(err, decoded) {
-        if (err) {
-            res
-            .status(500)
-            .send({auth: false, message: 'Failed to authenticate token.' });
+    if (user.id){
+        const con = await connection().catch((err) =>{
+            throw err;
+        })
+    }};
+
+    const existingUser = await query(con, GET_ME_USER_ID(user.id)).catch(
+        (err) => {
+            res.status(500).json({msg: "No user found"});
         }
+    );
 
-        con.query(queries.GET_ME_BY_USER_ID, [decoded.id], function(err, user) {
-            if (err) {
-            res.status(500).send({ msg: 'Could not find the user.'});
-        }
-    if (!user) {
-        res.status(400).send({ msg: 'No user found'});
+    if(existingUser.length){
+        res.status(200).send(existingUser);
+    } else {
+        res.staus(400).json({ msg: 'No user found'});
     }
-    res.status(200).send(user);
-    });
+
+    exports.updateMe = async function (req, res){
+       const con = await connection().catch((err) =>{
+           throw err;
+       })
+    }
+     const[existing_User] = await query(
+         con,
+         GET_ME_BY_USER_ID_WITH_PASSWORD(req.user.id)
+     ).catch((err) =>{
+         console.log(err);
+         res.status(500).json({ msg: "Could not retrieve user"});
+})
+
+const{
+    username: existisingUsername,
+    email: existingEmail,
+    password: existingPassword,
+} = existingUser;
+
+const {username, email, password} = req.body;
+const isPasswordSame = await bcrypt
+.compare(password, existingPassword)
+.catch((err) => {
+    console.log(err);
+    res.json(500),json({msg: 'invalid password'});
 });
-}
+
+const newUser = username || existisingUsername;
+const newEmail = email || existingEmail;
+const newPassword = isPasswordSame
+? bcrypt.hashSync(password)
+: existingPassword;
+
+const {
+    newUser: escapeUsername,
+    newEmail: escapedEmail,
+    newPassword: escapedPassword,
+} = escape ({
+    newUser,
+    newEmail,
+    newPassword,
+});
+
+const result = await query(
+    con,
+    UPDATE_USER(escpaedUsername, escapedEmail, escapedPassword, req.user.id)
+).catch((err)=>{
+console.log(err);
+res.status(500).json({msg: 'Could not update'});
+})
+
+if (result.affectedRows == 1){
+    res.json({ msg: 'Updated Successfully'});
+    } else {
+        res.json({ msg: 'Nothing to update'}),
+        {}}
